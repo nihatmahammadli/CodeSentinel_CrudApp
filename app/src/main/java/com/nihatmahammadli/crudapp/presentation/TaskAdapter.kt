@@ -1,116 +1,39 @@
 package com.nihatmahammadli.crudapp.presentation
 
-import android.app.AlertDialog
-import android.os.Bundle
-import android.text.InputType
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.EditText
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.nihatmahammadli.crudapp.data.DatabaseProvider
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import com.nihatmahammadli.crudapp.data.Task
-import com.nihatmahammadli.crudapp.data.TaskDao
-import com.nihatmahammadli.crudapp.databinding.FragmentHomeBinding
-import kotlinx.coroutines.launch
+import com.nihatmahammadli.crudapp.databinding.ItemTaskAdapterBinding
 
-class HomeFragment : Fragment() {
-    private lateinit var binding: FragmentHomeBinding
-    private lateinit var taskDao: TaskDao
-    private lateinit var adapter: TaskAdapter
+class TaskAdapter(
+    val onDeleteClick: (Task) -> Unit,
+    val onUpdateClick: (Task) -> Unit
+) : ListAdapter<Task, TaskAdapter.TaskViewHolder>(TaskDiffCallback()) {
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        binding = FragmentHomeBinding.inflate(inflater, container, false)
-        taskDao = DatabaseProvider.getDatabase(requireContext()).taskDao()
-        return binding.root
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): TaskViewHolder {
+        val binding = ItemTaskAdapterBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return TaskViewHolder(binding)
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+    override fun onBindViewHolder(holder: TaskViewHolder, position: Int) {
+        val task = getItem(position)
+        holder.binding.taskTxt.text = task.description
 
-        adapter = TaskAdapter(
-            onDeleteClick = { task -> deleteTask(task) },
-            onUpdateClick = { task -> updateTaskDialog(task) }
-        )
-        binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
-        binding.recyclerView.adapter = adapter
-
-        loadTasks()
-
-        binding.addNewTask.setOnClickListener {
-            addNewTask()
+        holder.binding.deleteBtn.setOnClickListener {
+            onDeleteClick(task)
+        }
+        holder.binding.updateBtn.setOnClickListener {
+            onUpdateClick(task)
         }
     }
 
-    private fun loadTasks() {
-        lifecycleScope.launch {
-            val tasks = taskDao.getTasks()
-            adapter.submitList(tasks)
-        }
-    }
+    inner class TaskViewHolder(val binding: ItemTaskAdapterBinding) : RecyclerView.ViewHolder(binding.root)
 
-    private fun addNewTask() {
-        val editText = EditText(requireContext()).apply {
-            hint = "Write new task"
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Add New Task")
-            .setView(editText)
-            .setPositiveButton("Add") { dialog, _ ->
-                val taskDesc = editText.text.toString().trim()
-                if (taskDesc.isNotEmpty()) {
-                    addTaskToDb(taskDesc)
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .show()
-    }
-
-    private fun addTaskToDb(description: String) {
-        val newTask = Task(description = description)
-        lifecycleScope.launch {
-            taskDao.insertTask(newTask)
-            loadTasks()
-        }
-    }
-
-    private fun deleteTask(task: Task) {
-        lifecycleScope.launch {
-            taskDao.deleteTask(task)
-            loadTasks()
-        }
-    }
-
-    private fun updateTaskDialog(task: Task) {
-        val editText = EditText(requireContext()).apply {
-            hint = "Update task"
-            setText(task.description)
-            inputType = InputType.TYPE_CLASS_TEXT
-        }
-
-        AlertDialog.Builder(requireContext())
-            .setTitle("Update Task")
-            .setView(editText)
-            .setPositiveButton("Update") { dialog, _ ->
-                val updatedDesc = editText.text.toString().trim()
-                if (updatedDesc.isNotEmpty()) {
-                    val updatedTask = task.copy(description = updatedDesc)
-                    lifecycleScope.launch {
-                        taskDao.updateTask(updatedTask)
-                        loadTasks()
-                    }
-                }
-                dialog.dismiss()
-            }
-            .setNegativeButton("Cancel") { dialog, _ -> dialog.dismiss() }
-            .show()
+    class TaskDiffCallback : DiffUtil.ItemCallback<Task>() {
+        override fun areItemsTheSame(oldItem: Task, newItem: Task) = oldItem.id == newItem.id
+        override fun areContentsTheSame(oldItem: Task, newItem: Task) = oldItem == newItem
     }
 }
