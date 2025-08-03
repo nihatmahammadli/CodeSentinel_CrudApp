@@ -6,4 +6,5 @@
     </style>
 
     <style name="Theme.CrudApp" parent="Base.Theme.CrudApp" />
+
 </resources>
